@@ -1,0 +1,94 @@
+import sys
+import os
+
+
+def validate_date(date_str):
+    if len(date_str) != 10:
+        return False
+    try:
+        year, month, day = map(int, date_str.split("-"))
+        assert 1 <= month <= 12
+        assert 1 <= day <= 31
+    except:
+        return False
+    return True
+
+
+def find_start_position(file, target_date):
+    file.seek(0, os.SEEK_END)
+    file_size = file.tell()
+    low = 0
+    high = file_size
+    result = None
+
+    while low < high:
+        mid = (low + high) // 2
+        file.seek(mid)
+        # Read to the next full line
+        file.readline()
+        pos = file.tell()
+        line = file.readline()
+        if not line:
+            high = mid
+            continue
+        line_date = line[:10]
+        if line_date < target_date:
+            low = file.tell()
+        elif line_date > target_date:
+            high = mid
+        else:
+            result = pos
+            high = mid
+    if result is None:
+        file.seek(low)
+        line = file.readline()
+        if line.startswith(target_date):
+            result = file.tell() - len(line)
+    return result
+
+
+def extract_logs(file_path, target_date, output_path):
+    with open(file_path, "rb") as f:
+        start_pos = find_start_position(f, target_date.encode())
+        if start_pos is None:
+            print(f"No logs found for date {target_date}.")
+            return
+        f.seek(start_pos)
+        with open(output_path, "w", encoding="utf-8") as out_file:
+            while True:
+                line = f.readline()
+                if not line:
+                    break
+                decoded_line = line.decode("utf-8", errors="ignore")
+                if decoded_line.startswith(target_date):
+                    out_file.write(decoded_line)
+                else:
+                    break
+
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: python extract_logs.py YYYY-MM-DD")
+        sys.exit(1)
+
+    target_date = sys.argv[1]
+    if not validate_date(target_date):
+        print("Invalid date format. Use YYYY-MM-DD.")
+        sys.exit(1)
+
+    log_file = "test_logs.log"
+    output_dir = "output"
+    output_file = os.path.join(output_dir, f"output_{target_date}.txt")
+
+    if not os.path.exists(log_file):
+        print(f"Log file {log_file} does not exist. Please download it first.")
+        sys.exit(1)
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    extract_logs(log_file, target_date, output_file)
+    print(f"Logs for {target_date} have been saved to {output_file}.")
+
+
+if __name__ == "_main_":
+    main()
